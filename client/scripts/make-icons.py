@@ -6,12 +6,19 @@ turquesa #2DD4BF y un turquesa profundo para la porcion menor.
 """
 
 import math
+import os
 import struct
 import zlib
 
 BG = (0x0E, 0x11, 0x16)
 MAIN = (0x2D, 0xD4, 0xBF)
 SECOND = (0x0F, 0x76, 0x6E)
+
+# Proporciones del anillo dentro del lienzo, en fracciones del lado. Salen del
+# icono principal: el splash y el favicon usan las mismas para que en todos
+# lados se vea la misma figura y no una version mas chica o mas gorda.
+OUTER = 340 / 1024
+INNER = 196 / 1024
 
 # Donde se corta el anillo, en grados. La porcion mayor va de START a SPLIT.
 START = -90.0
@@ -110,23 +117,34 @@ def solid(size, color):
     return px
 
 
-BASE = 'D:/Laburo/Empezar/Gastos gestionados/client/assets/images'
+def icon(size, background=None, mono=False):
+    """El simbolo con las proporciones del icono principal."""
+    return render(size, round(size * OUTER), round(size * INNER), background, mono)
+
+
+# Junto al script, para que siga funcionando si el proyecto cambia de carpeta.
+BASE = os.path.normpath(
+    os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'assets', 'images')
+)
 
 # Icono principal: simbolo sobre el fondo de la app.
-write_png(f'{BASE}/icon.png', 1024, 1024, render(1024, 340, 196, background=BG))
+write_png(f'{BASE}/icon.png', 1024, 1024, icon(1024, background=BG))
 
-# Adaptive icon de Android: el simbolo entra en la zona segura del 66%.
+# Adaptive icon de Android: aca el simbolo va mas chico porque el launcher
+# recorta el lienzo, y solo el 66% central esta garantizado.
 write_png(f'{BASE}/android-icon-foreground.png', 1024, 1024, render(1024, 268, 155))
 write_png(f'{BASE}/android-icon-background.png', 1024, 1024, solid(1024, BG))
 write_png(f'{BASE}/android-icon-monochrome.png', 1024, 1024, render(1024, 268, 155, mono=True))
 
-# Splash: se dibuja sobre el color de fondo configurado en app.json.
-write_png(f'{BASE}/splash-icon.png', 1024, 1024, render(1024, 300, 173))
+# Splash: mismo dibujo que el icono. Se deja transparente porque el color de
+# fondo lo pone app.json, y asi el mismo archivo sirve en claro y en oscuro.
+write_png(f'{BASE}/splash-icon.png', 1024, 1024, icon(1024))
 
-# Favicon.
-write_png(f'{BASE}/favicon.png', 64, 64, render(64, 22, 12, background=BG))
+# Favicon: el mismo icono, en el tamano que pide la pestana del navegador.
+write_png(f'{BASE}/favicon.png', 64, 64, icon(64, background=BG))
 
-# Logo para usar dentro de la app: sin fondo y sin el margen del launcher.
+# Logo para usar dentro de la app: sin fondo y sin el margen del launcher, que
+# ahi no hace falta reservar lugar para el recorte.
 write_png(f'{BASE}/logo.png', 256, 256, render(256, 120, 69))
 
-print('iconos generados')
+print(f'iconos generados en {BASE}')
