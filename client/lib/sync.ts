@@ -113,24 +113,55 @@ export async function checkHousehold(code: string): Promise<string> {
   return rpc<string>('check_household', { p_code: code });
 }
 
+/** Lo que este dispositivo tiene para subir al hogar. */
+export type LocalChanges = {
+  people: Person[];
+  expenses: Expense[];
+};
+
 /**
- * Sube lo local y baja lo remoto en una pasada. Devuelve las listas ya
- * combinadas, listas para guardar en el dispositivo.
+ * Cuánto se retrocede sobre la marca del servidor al pedir novedades. El
+ * servidor calcula esa marca al empezar a leer, así que una escritura de otro
+ * dispositivo que se confirme un instante después queda del lado viejo del
+ * corte y no llegaría nunca. El margen la vuelve a incluir: el precio es
+ * recibir de nuevo unos pocos registros que ya teníamos.
+ */
+const OVERLAP_SECONDS = 5;
+
+export function withOverlap(since: string | null): string | null {
+  if (!since) return null;
+  const time = Date.parse(since);
+  // Una marca ilegible se trata como "nunca sincronizado": mejor traer de más.
+  if (Number.isNaN(time)) return null;
+  return new Date(time - OVERLAP_SECONDS * 1000).toISOString();
+}
+
+/**
+ * Sube lo local y baja lo remoto en una pasada. Devuelve lo que vino del
+ * servidor, sin combinar: lo combina cada contexto sobre su estado actual.
+ *
+ * `changes` en null significa que este dispositivo no cambió nada desde la
+ * última subida, y entonces se ahorra el viaje de ida: es el caso de la
+ * consulta periódica, que solo va a buscar lo que hicieron los demás.
  */
 export async function synchronize(
   code: string,
-  localPeople: Person[],
-  localExpenses: Expense[],
+  changes: LocalChanges | null,
   since: string | null
 ): Promise<SyncResult> {
-  await rpc<{ server_time: string }>('push_changes', {
-    p_code: code,
-    p_people: localPeople.map(fromPerson),
-    // Los que ya cumplieron el plazo no se vuelven a subir: si no, resucitan.
-    p_expenses: localExpenses.filter((e) => !isBeyondRetention(e)).map(fromExpense),
-  });
+  if (changes) {
+    await rpc<{ server_time: string }>('push_changes', {
+      p_code: code,
+      p_people: changes.people.map(fromPerson),
+      // Los que ya cumplieron el plazo no se vuelven a subir: si no, resucitan.
+      p_expenses: changes.expenses.filter((e) => !isBeyondRetention(e)).map(fromExpense),
+    });
+  }
 
-  const pulled = await rpc<PullResponse>('pull_changes', { p_code: code, p_since: since });
+  const pulled = await rpc<PullResponse>('pull_changes', {
+    p_code: code,
+    p_since: withOverlap(since),
+  });
 
   return {
     people: pulled.people.map(toPerson),

@@ -75,7 +75,9 @@ export function usePersistedState<T>(
       }
       setValue((previous) => {
         const next = updater(previous);
-        persist(next);
+        // Si no cambió nada no se reescribe el disco: la sincronización
+        // periódica trae listas iguales y guardarlas sería puro desgaste.
+        if (next !== previous) persist(next);
         return next;
       });
     },

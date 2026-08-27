@@ -9,8 +9,8 @@ import { Card } from '@/components/ui/card';
 import { TextField } from '@/components/ui/text-field';
 import { Spacing } from '@/constants/layout';
 import { useHousehold } from '@/contexts/household-context';
+import { useSync } from '@/contexts/sync-context';
 import { useLayout } from '@/hooks/use-layout';
-import { useSync } from '@/hooks/use-sync';
 import { useThemeColor } from '@/hooks/use-theme-color';
 import { isSupabaseConfigured } from '@/lib/supabase';
 
@@ -19,7 +19,7 @@ const MIN_CODE_LENGTH = 8;
 export default function HouseholdScreen() {
   const { contentWidth, isNarrow } = useLayout();
   const { household, create, join, leave } = useHousehold();
-  const { status, error: syncError, syncNow } = useSync();
+  const { status, error: syncError, syncNow, hasPendingChanges } = useSync();
 
   const muted = useThemeColor({}, 'muted');
 
@@ -89,10 +89,12 @@ export default function HouseholdScreen() {
               {status === 'syncing'
                 ? 'Sincronizando…'
                 : status === 'error'
-                  ? 'No se pudo sincronizar. Se reintenta al próximo cambio.'
-                  : household.lastSyncAt
-                    ? `Última sincronización: ${new Date(household.lastSyncAt).toLocaleString('es-AR')}`
-                    : 'Todavía no se sincronizó.'}
+                  ? 'No se pudo sincronizar. Se reintenta solo en unos segundos.'
+                  : hasPendingChanges
+                    ? 'Hay cambios sin subir. Viajan en unos segundos.'
+                    : household.lastSyncAt
+                      ? `Al día. Última sincronización: ${new Date(household.lastSyncAt).toLocaleString('es-AR')}`
+                      : 'Todavía no se sincronizó.'}
             </ThemedText>
             <FeedbackBanner message={null} error={syncError} onDismiss={() => {}} />
             <View style={[styles.actions, isNarrow && styles.stacked]}>
@@ -110,9 +112,10 @@ export default function HouseholdScreen() {
               />
             </View>
             <ThemedText style={[styles.hint, { color: muted }]}>
-              Se sincroniza al abrir la app. Lo que cargues después viaja cuando toques
-              Sincronizar ahora o la próxima vez que la abras. Salir no borra nada: los gastos
-              quedan en este dispositivo y en el hogar.
+              Se sincroniza sola: lo que cargás viaja a los pocos segundos y lo que cargan los
+              demás aparece acá sin hacer nada. El botón es por si querés que sea ya. Sin
+              conexión la app funciona igual y los cambios salen cuando vuelve. Salir no borra
+              nada: los gastos quedan en este dispositivo y en el hogar.
             </ThemedText>
           </Card>
         </ScrollView>

@@ -1,6 +1,6 @@
 import React, { createContext, useCallback, useContext, useMemo } from 'react';
 
-import { usePersistedState } from '@/hooks/use-persisted-state';
+import { useSyncedState } from '@/hooks/use-synced-state';
 import { pruneOldExpenses } from '@/lib/retention';
 import { applyRemote } from '@/lib/sync';
 import { pruneTombstones } from '@/lib/tombstones';
@@ -22,6 +22,8 @@ type ExpensesContextValue = {
   unassignPerson: (personId: string) => void;
   /** Combina lo que vino del hogar compartido con lo que hay en el dispositivo. */
   mergeRemote: (remote: Expense[]) => void;
+  /** Cuántas veces cambiaron los gastos en este dispositivo, para saber qué falta subir. */
+  localRevision: number;
 };
 
 const ExpensesContext = createContext<ExpensesContextValue | null>(null);
@@ -35,14 +37,16 @@ export function ExpensesProvider({ children }: { children: React.ReactNode }) {
   const {
     value: allExpenses,
     update,
+    updateFromRemote,
+    localRevision,
     loading,
-  } = usePersistedState<Expense[]>(STORAGE_KEY, [], migrate);
+  } = useSyncedState<Expense[]>(STORAGE_KEY, [], migrate);
 
   const expenses = useMemo(() => allExpenses.filter(isVisible), [allExpenses]);
 
   const mergeRemote = useCallback(
-    (remote: Expense[]) => update((prev) => applyRemote(prev, remote)),
-    [update]
+    (remote: Expense[]) => updateFromRemote((prev) => applyRemote(prev, remote)),
+    [updateFromRemote]
   );
 
   const addExpense = useCallback(
@@ -93,6 +97,7 @@ export function ExpensesProvider({ children }: { children: React.ReactNode }) {
       removeExpense,
       unassignPerson,
       mergeRemote,
+      localRevision,
     }),
     [
       expenses,
@@ -103,6 +108,7 @@ export function ExpensesProvider({ children }: { children: React.ReactNode }) {
       removeExpense,
       unassignPerson,
       mergeRemote,
+      localRevision,
     ]
   );
 

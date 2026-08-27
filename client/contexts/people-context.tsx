@@ -1,6 +1,6 @@
 import React, { createContext, useCallback, useContext, useMemo } from 'react';
 
-import { usePersistedState } from '@/hooks/use-persisted-state';
+import { useSyncedState } from '@/hooks/use-synced-state';
 import { applyRemote } from '@/lib/sync';
 import { pruneTombstones } from '@/lib/tombstones';
 import type { Person } from '@/lib/types';
@@ -21,6 +21,8 @@ type PeopleContextValue = {
   removePerson: (id: string) => void;
   /** Combina lo que vino del hogar compartido con lo que hay en el dispositivo. */
   mergeRemote: (remote: Person[]) => void;
+  /** Cuántas veces cambiaron las personas en este dispositivo, para saber qué falta subir. */
+  localRevision: number;
 };
 
 const PeopleContext = createContext<PeopleContextValue | null>(null);
@@ -38,8 +40,10 @@ export function PeopleProvider({ children }: { children: React.ReactNode }) {
   const {
     value: allPeople,
     update,
+    updateFromRemote,
+    localRevision,
     loading,
-  } = usePersistedState<Person[]>(STORAGE_KEY, [], migrate);
+  } = useSyncedState<Person[]>(STORAGE_KEY, [], migrate);
 
   const people = useMemo(() => allPeople.filter(isVisible), [allPeople]);
 
@@ -78,8 +82,8 @@ export function PeopleProvider({ children }: { children: React.ReactNode }) {
   );
 
   const mergeRemote = useCallback(
-    (remote: Person[]) => update((prev) => applyRemote(prev, remote)),
-    [update]
+    (remote: Person[]) => updateFromRemote((prev) => applyRemote(prev, remote)),
+    [updateFromRemote]
   );
 
   const value = useMemo(
@@ -92,8 +96,9 @@ export function PeopleProvider({ children }: { children: React.ReactNode }) {
       renamePerson,
       removePerson,
       mergeRemote,
+      localRevision,
     }),
-    [people, allPeople, loading, addPerson, renamePerson, removePerson, mergeRemote]
+    [people, allPeople, loading, addPerson, renamePerson, removePerson, mergeRemote, localRevision]
   );
 
   return <PeopleContext.Provider value={value}>{children}</PeopleContext.Provider>;

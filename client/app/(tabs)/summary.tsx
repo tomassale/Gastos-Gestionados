@@ -15,9 +15,10 @@ import { Amount } from '@/components/ui/amount';
 import { Card } from '@/components/ui/card';
 import { Spacing } from '@/constants/layout';
 import { useExpenses } from '@/contexts/expenses-context';
+import { useHousehold } from '@/contexts/household-context';
 import { usePeople } from '@/contexts/people-context';
+import { useSync } from '@/contexts/sync-context';
 import { useLayout } from '@/hooks/use-layout';
-import { useSync } from '@/hooks/use-sync';
 import { useThemeColor } from '@/hooks/use-theme-color';
 import { settle, totalsByPerson } from '@/lib/balance';
 import { formatCurrency } from '@/lib/format';
@@ -31,7 +32,8 @@ export default function SummaryScreen() {
   const { isWide, isNarrow, wideContentWidth } = useLayout();
   const { expenses } = useExpenses();
   const { people } = usePeople();
-  const { status: syncStatus, household } = useSync();
+  const { household } = useHousehold();
+  const { status: syncStatus, hasPendingChanges } = useSync();
   const [month, setMonth] = useState(nowYearMonth);
 
   const muted = useThemeColor({}, 'muted');
@@ -143,7 +145,9 @@ export default function SummaryScreen() {
                 ? `Sincronizando con ${household.name}…`
                 : syncStatus === 'error'
                   ? `Sin conexión con ${household.name}. Los gastos se guardan igual y se sincronizan después.`
-                  : `Sincronizado con ${household.name} al abrir la app.`}
+                  : hasPendingChanges
+                    ? `Subiendo los cambios a ${household.name}…`
+                    : `Al día con ${household.name}.`}
           </ThemedText>
         </Card>
 

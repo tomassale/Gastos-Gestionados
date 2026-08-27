@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 
-import { applyRemote } from '@/lib/sync';
+import { applyRemote, withOverlap } from '@/lib/sync';
 import type { Expense } from '@/lib/types';
 
 function expense(overrides: Partial<Expense>): Expense {
@@ -50,5 +50,20 @@ describe('applyRemote', () => {
     );
 
     expect(resultado[0].deleted).toBe(true);
+  });
+});
+
+describe('withOverlap', () => {
+  test('sin marca previa pide todo', () => {
+    expect(withOverlap(null)).toBeNull();
+  });
+
+  test('retrocede unos segundos para no perder lo que se escribió en el borde', () => {
+    const resultado = withOverlap('2026-08-27T12:00:30.000Z');
+    expect(resultado).toBe('2026-08-27T12:00:25.000Z');
+  });
+
+  test('una marca ilegible se trata como nunca sincronizado', () => {
+    expect(withOverlap('cualquier cosa')).toBeNull();
   });
 });

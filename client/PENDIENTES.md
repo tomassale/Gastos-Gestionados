@@ -17,10 +17,16 @@ Estado al 26 de agosto de 2026.
       así que no se puede abrir desde otro dispositivo. También queda renombrar el proyecto de
       `dist` a `gastos-gestionados`. Lo intenté por API y el token del CLI no autoriza; se hace
       desde el panel, o autorizando la integración de Vercel con el enlace que te pasé.
-- [ ] **El commit inicial**, que lo hacés vos. El repo está reiniciado y los 66 archivos están
+- [x] **El commit inicial**, que lo hacés vos. El repo está reiniciado y los 66 archivos están
       en el índice.
 
 ## Sin verificar
+
+- [ ] **La sincronización automática, con dos dispositivos en la mano.** Lo verificado el
+      27/8/2026 es la capa de red, contra la base real y con dos dispositivos simulados: la
+      subida llega, el pull incremental con margen trae lo nuevo sin volver a bajar todo, y las
+      bajas viajan. Falta ver los temporizadores en vivo: cargar un gasto en un teléfono y
+      verlo aparecer solo en el otro, sin tocar nada.
 
 - [x] ~~Sincronización de punta a punta~~ — **verificada contra la base real** el 27/8/2026, en
       las dos direcciones: un gasto enviado desde afuera apareció solo en el emulador (con su
@@ -32,7 +38,7 @@ Estado al 26 de agosto de 2026.
 
 ## Para hacer cuando estén los datos de arriba
 
-- [ ] Cargar `EXPO_PUBLIC_SUPABASE_URL` y `EXPO_PUBLIC_SUPABASE_ANON_KEY` en el proyecto de
+- [x] Cargar `EXPO_PUBLIC_SUPABASE_URL` y `EXPO_PUBLIC_SUPABASE_ANON_KEY` en el proyecto de
       Vercel y redesplegar. Las variables se compilan dentro del bundle: sin redeploy no toman
       efecto.
 - [ ] Conectar el repo de GitHub a Vercel para que cada push despliegue solo, en vez de correr
@@ -55,10 +61,19 @@ Estado al 26 de agosto de 2026.
   los dos lados: si se borrara solo en la base, el teléfono los volvería a subir en la próxima
   sincronización. **No hay respaldo**: al no existir más la exportación a Excel, lo que se borra
   se pierde.
-- **La sincronización corre una sola vez al abrir la app**, y después solo a pedido con
-  "Sincronizar ahora". Lo que se carga durante la sesión no viaja hasta la próxima apertura o
-  hasta tocar el botón: menos llamadas, a costa de que el otro dispositivo pueda ver datos
-  viejos.
+- **La sincronización es automática** (27/8/2026, reemplaza a la decisión anterior de
+  sincronizar solo al abrir). Lo que se carga en un dispositivo sube **a los 1,5 segundos** y
+  aparece en los demás **a los 20 segundos como mucho**, que es cada cuánto se pregunta por
+  novedades con la app a la vista. Además sincroniza al volver a primer plano y sube lo
+  pendiente al pasar a segundo plano. "Sincronizar ahora" queda como atajo.
+  El costo son ~180 llamadas por hora y por dispositivo con la app abierta; cuando no hay nada
+  propio para subir, la consulta periódica hace **una sola** llamada (`pull_changes`) y no
+  reenvía el historial.
+- **No se usa Supabase Realtime**, que daría aviso instantáneo por WebSocket en vez de
+  preguntar cada 20 segundos. Realtime respeta RLS y hoy las tablas están cerradas sin
+  políticas: habría que abrirlas a la anon key —que viaja dentro de la app— y eso tira abajo el
+  modelo de seguridad del código de hogar. La consulta periódica es más tosca y mucho más
+  barata en riesgo.
 - **Acceso por código de hogar, sin login.** Es lo que elegiste sabiendo el riesgo: la anon key
   viaja dentro de la app y es visible en el sitio publicado, así que lo único que protege los
   datos es el código. Que sea largo y no circule por canales públicos. Las tablas están cerradas
@@ -97,10 +112,9 @@ Estado al 26 de agosto de 2026.
       exportación a Excel, esos gastos desaparecen sin dejar rastro. Si alguna vez importa
       conservarlos, la salida sería guardar un resumen por mes antes de borrar el detalle.
 
-- [x] ~~No hay tests automatizados~~ — 70 tests en `lib/__tests__`, se corren con `bun test`.
-      Cubren montos, fechas, meses, resumen, balance y reparto, validación del formulario, ida y
-      vuelta por Excel, y la fusión (Excel y sincronización). Para poder probarla sin montar
-      React, la fusión de planillas salió del contexto a `lib/merge.ts`.
+- [x] ~~No hay tests automatizados~~ — 77 tests en `lib/__tests__`, se corren con `bun test`.
+      Cubren montos, fechas, meses, resumen, balance y reparto, validación del formulario, la
+      fusión de lo que llega del hogar y el margen del pull incremental.
 - [ ] **El README sigue siendo el del template de Expo.** Cuando quieras documentar, se hace con
       el subagente `documentador`.
 - [x] ~~El ícono de Android tenía fondo claro~~ — íconos nuevos: un anillo partido en dos
@@ -109,10 +123,12 @@ Estado al 26 de agosto de 2026.
 - [ ] **Los dos formularios del hogar comparten el campo de código**: escribir en "Entrar"
       también completa "Crear uno nuevo". Funciona, pero confunde.
 - [ ] **Quedaron datos de prueba en la nube**: el hogar `casa-prueba-9271-vk` con un gasto de
-      prueba, y otro hogar llamado "x". Se borran con `reset.sql` o dejándolos morir.
-- [ ] **No hay forma de sincronizar al cerrar la app.** Con la sincronización solo al inicio, si
-      cargás gastos y cerrás sin tocar el botón, quedan esperando a la próxima apertura. Se
-      podría enganchar al pasar a segundo plano con `AppState`.
+      prueba, otro hogar llamado "x", y el de la prueba de sincronización automática
+      (`Prueba sincronización`, del 27/8/2026). Se borran con `reset.sql`, o el último con
+      `delete from households where name = 'Prueba sincronización';`.
+- [x] ~~No hay forma de sincronizar al cerrar la app~~ — al pasar a segundo plano se sube lo
+      que haya quedado pendiente (`AppState`, en `hooks/use-sync.ts`). Si el sistema mata la app
+      antes de que termine el envío, igual viaja en la próxima apertura.
 - [x] ~~Los tombstones no se limpian nunca~~ — se olvidan a los **90 días** (`lib/tombstones.ts`),
       tanto en el dispositivo al cargar los datos como en la base, dentro de `push_changes`. El
       plazo tiene que ser mayor que lo que un teléfono puede estar sin abrir la app: si se olvida
