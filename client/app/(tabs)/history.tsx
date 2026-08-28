@@ -1,46 +1,46 @@
 import { useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { EmptyState } from '@/components/expenses/empty-state';
 import { ExpenseList } from '@/components/expenses/expense-list';
+import { MonthSwitcher } from '@/components/expenses/month-switcher';
 import { PersonFilter } from '@/components/expenses/person-filter';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Amount } from '@/components/ui/amount';
 import { Card } from '@/components/ui/card';
-import { IconSymbol } from '@/components/ui/icon-symbol';
 import { ScreenHeader } from '@/components/ui/screen-header';
 import { Spacing } from '@/constants/layout';
 import { useExpenses } from '@/contexts/expenses-context';
 import { usePeople } from '@/contexts/people-context';
 import { useLayout } from '@/hooks/use-layout';
 import { useThemeColor } from '@/hooks/use-theme-color';
-import { capitalize } from '@/lib/format';
-import { filterByMonth, formatMonthLabel, nowYearMonth, totalAmount } from '@/lib/month';
+import { filterByMonth, nowYearMonth, shiftMonth, totalAmount } from '@/lib/month';
 import { filterByPerson, sortByDateDesc } from '@/lib/summary';
+import { earliestKeptMonth, RETENTION_YEARS } from '@/lib/retention';
 import type { Expense } from '@/lib/types';
 
 /**
- * Los gastos de este mes, que es lo que se mira todos los días. Los meses
- * anteriores viven en la pantalla de Historial.
+ * Los meses ya cerrados. Arranca en el anterior y no deja avanzar hasta el
+ * actual: ese tiene su propia pantalla, y mezclarlos haría que el mismo gasto
+ * apareciera en dos lugares con el mismo aspecto.
  */
-export default function ExpensesScreen() {
+export default function HistoryScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { contentWidth } = useLayout();
   const { expenses, loading } = useExpenses();
   const { people } = usePeople();
-  const [personId, setPersonId] = useState<string | null>(null);
 
   const muted = useThemeColor({}, 'muted');
   const tint = useThemeColor({}, 'tint');
-  const background = useThemeColor({}, 'background');
 
-  // Se resuelve una vez por sesión: con la app abierta al cruzar la
-  // medianoche del último día del mes, se actualiza al volver a entrar.
-  const month = useMemo(nowYearMonth, []);
+  const lastClosedMonth = useMemo(() => shiftMonth(nowYearMonth(), -1), []);
+  const oldestMonth = useMemo(() => earliestKeptMonth(), []);
+  const [month, setMonth] = useState(lastClosedMonth);
+  const [personId, setPersonId] = useState<string | null>(null);
 
   const monthExpenses = useMemo(() => filterByMonth(expenses, month), [expenses, month]);
   const visible = useMemo(
@@ -49,10 +49,8 @@ export default function ExpensesScreen() {
   );
   const total = useMemo(() => totalAmount(visible), [visible]);
 
-  const openForm = (expense?: Expense) =>
-    router.push(
-      expense ? { pathname: '/expense-form', params: { id: expense.id } } : '/expense-form'
-    );
+  const openForm = (expense: Expense) =>
+    router.push({ pathname: '/expense-form', params: { id: expense.id } });
 
   if (loading) {
     return (
@@ -73,11 +71,18 @@ export default function ExpensesScreen() {
         contentContainerStyle={[
           styles.list,
           contentWidth,
-          { paddingTop: insets.top + Spacing.lg, paddingBottom: insets.bottom + 96 },
+          { paddingTop: insets.top + Spacing.lg, paddingBottom: insets.bottom + Spacing.xxl },
         ]}
         header={
           <View style={styles.header}>
-            <ScreenHeader title="Gastos" subtitle={capitalize(formatMonthLabel(month))} />
+            <ScreenHeader title="Historial" subtitle="Los meses anteriores a este." />
+
+            <MonthSwitcher
+              value={month}
+              onChange={setMonth}
+              max={lastClosedMonth}
+              min={oldestMonth}
+            />
 
             <Card style={styles.totalCard}>
               <ThemedText style={[styles.label, { color: muted }]}>
@@ -94,23 +99,13 @@ export default function ExpensesScreen() {
         }
         empty={
           <EmptyState
-            title={selectedPersonName ? `Sin gastos de ${selectedPersonName}` : 'No hay gastos este mes'}
-            description="Agregá el primero con el botón +."
+            title={
+              selectedPersonName ? `Sin gastos de ${selectedPersonName}` : 'No hay gastos ese mes'
+            }
+            description={`Movete entre meses con las flechas. Se guardan ${RETENTION_YEARS} años hacia atrás.`}
           />
         }
       />
-
-      <View style={styles.fabLayer} pointerEvents="box-none">
-        <View style={[contentWidth, styles.fabAnchor, { paddingBottom: insets.bottom + Spacing.xl }]}>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Agregar gasto"
-            onPress={() => openForm()}
-            style={({ pressed }) => [styles.fab, { backgroundColor: tint, opacity: pressed ? 0.85 : 1 }]}>
-            <IconSymbol name="plus" size={28} color={background} />
-          </Pressable>
-        </View>
-      </View>
     </ThemedView>
   );
 }
@@ -139,28 +134,5 @@ const styles = StyleSheet.create({
     lineHeight: 18,
     textTransform: 'uppercase',
     letterSpacing: 0.6,
-  },
-  // Capa transparente sobre la lista: mantiene el botón alineado con el
-  // contenido centrado en vez de pegarlo al borde de la ventana.
-  fabLayer: {
-    ...StyleSheet.absoluteFillObject,
-  },
-  fabAnchor: {
-    flex: 1,
-    justifyContent: 'flex-end',
-    alignItems: 'flex-end',
-    paddingHorizontal: Spacing.lg,
-  },
-  fab: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    alignItems: 'center',
-    justifyContent: 'center',
-    elevation: 4,
-    shadowColor: '#000',
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 2 },
   },
 });

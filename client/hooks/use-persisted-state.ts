@@ -27,13 +27,8 @@ export function usePersistedState<T>(
 
   const hydrated = useRef(false);
   const pending = useRef<Updater<T>[]>([]);
-
-  const persist = useCallback(
-    (next: T) => {
-      void AsyncStorage.setItem(key, JSON.stringify(next));
-    },
-    [key]
-  );
+  /** Lo último que llegó al disco, para no reescribir lo que ya está guardado. */
+  const persisted = useRef<T | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -54,35 +49,40 @@ export function usePersistedState<T>(
       pending.current = [];
       const next = queued.reduce((acc, updater) => updater(acc), stored);
 
+      // Lo que vino del disco ya está en el disco: si nada se encoló, el efecto
+      // de guardado no tiene que devolverlo.
+      persisted.current = stored;
       hydrated.current = true;
       setValue(next);
-      if (queued.length > 0) persist(next);
       setLoading(false);
     })();
 
     return () => {
       cancelled = true;
     };
-  }, [key, persist]);
+  }, [key]);
 
-  const update = useCallback(
-    (updater: Updater<T>) => {
-      if (!hydrated.current) {
-        // Todavía no sabemos qué hay guardado: no se puede escribir sin pisarlo.
-        pending.current.push(updater);
-        setValue((previous) => updater(previous));
-        return;
-      }
-      setValue((previous) => {
-        const next = updater(previous);
-        // Si no cambió nada no se reescribe el disco: la sincronización
-        // periódica trae listas iguales y guardarlas sería puro desgaste.
-        if (next !== previous) persist(next);
-        return next;
-      });
-    },
-    [persist]
-  );
+  /**
+   * El guardado va en un efecto y no dentro del updater de `setValue`: React
+   * puede llamar a ese updater más de una vez por render, así que tiene que ser
+   * puro. Escribir ahí adentro duplica la escritura.
+   */
+  useEffect(() => {
+    // La sincronización periódica trae listas iguales a las que ya hay: si el
+    // estado no cambió de identidad, guardarlo sería puro desgaste del disco.
+    if (!hydrated.current || value === persisted.current) return;
+
+    persisted.current = value;
+    void AsyncStorage.setItem(key, JSON.stringify(value));
+  }, [key, value]);
+
+  const update = useCallback((updater: Updater<T>) => {
+    if (!hydrated.current) {
+      // Todavía no sabemos qué hay guardado: no se puede escribir sin pisarlo.
+      pending.current.push(updater);
+    }
+    setValue((previous) => updater(previous));
+  }, []);
 
   return { value, update, loading };
 }

@@ -1,4 +1,4 @@
-import { isBeyondRetention } from '@/lib/retention';
+import { isBeyondRetention, retentionCutoff } from '@/lib/retention';
 import { rpc } from '@/lib/supabase';
 import { isExpiredTombstone } from '@/lib/tombstones';
 import type { Expense, Person, Syncable } from '@/lib/types';
@@ -120,6 +120,38 @@ export type LocalChanges = {
 };
 
 /**
+ * Lo modificado en este dispositivo desde la última subida confirmada. Sin este
+ * corte, editar un solo gasto vuelve a mandar el historial entero y el servidor
+ * reescribe todas las filas para dejarlas igual que estaban.
+ *
+ * `since` vacío significa que no hay nada confirmado todavía —hogar recién
+ * creado o recién unido— y entonces sube todo, que es lo correcto.
+ */
+export function changesSince(
+  people: Person[],
+  expenses: Expense[],
+  since: string
+): LocalChanges {
+  return {
+    people: people.filter((p) => p.updatedAt > since),
+    expenses: expenses.filter((e) => e.updatedAt > since),
+  };
+}
+
+/**
+ * Hasta dónde llega lo que se subió. Sale del propio contenido y no del reloj:
+ * si algo se cargó mientras se armaba el envío y no llegó a entrar, su marca
+ * queda por encima de esta y viaja en la próxima subida, en vez de quedar del
+ * lado de lo ya confirmado y no salir nunca.
+ */
+export function highWaterMark(changes: LocalChanges, since: string): string {
+  let mark = since;
+  for (const person of changes.people) if (person.updatedAt > mark) mark = person.updatedAt;
+  for (const expense of changes.expenses) if (expense.updatedAt > mark) mark = expense.updatedAt;
+  return mark;
+}
+
+/**
  * Cuánto se retrocede sobre la marca del servidor al pedir novedades. El
  * servidor calcula esa marca al empezar a leer, así que una escritura de otro
  * dispositivo que se confirme un instante después queda del lado viejo del
@@ -149,12 +181,16 @@ export async function synchronize(
   changes: LocalChanges | null,
   since: string | null
 ): Promise<SyncResult> {
+  // Una sola vez por sincronización: como argumento por omisión se recalcularía
+  // por cada gasto, y son dos formateos de fecha cada uno.
+  const cutoff = retentionCutoff();
+
   if (changes) {
     await rpc<{ server_time: string }>('push_changes', {
       p_code: code,
       p_people: changes.people.map(fromPerson),
       // Los que ya cumplieron el plazo no se vuelven a subir: si no, resucitan.
-      p_expenses: changes.expenses.filter((e) => !isBeyondRetention(e)).map(fromExpense),
+      p_expenses: changes.expenses.filter((e) => !isBeyondRetention(e, cutoff)).map(fromExpense),
     });
   }
 
@@ -165,7 +201,7 @@ export async function synchronize(
 
   return {
     people: pulled.people.map(toPerson),
-    expenses: pulled.expenses.map(toExpense).filter((e) => !isBeyondRetention(e)),
+    expenses: pulled.expenses.map(toExpense).filter((e) => !isBeyondRetention(e, cutoff)),
     serverTime: pulled.server_time,
   };
 }

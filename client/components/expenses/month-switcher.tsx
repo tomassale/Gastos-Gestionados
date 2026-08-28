@@ -4,30 +4,39 @@ import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useThemeColor } from '@/hooks/use-theme-color';
 import { capitalize } from '@/lib/format';
-import { formatMonthLabel, type YearMonth } from '@/lib/month';
+import { compareMonths, formatMonthLabel, shiftMonth, type YearMonth } from '@/lib/month';
 
 type MonthSwitcherProps = {
   value: YearMonth;
   onChange: (next: YearMonth) => void;
+  /** Hasta dónde se puede avanzar. Sin esto no hay tope hacia adelante. */
+  max?: YearMonth;
+  /** Hasta dónde se puede retroceder. Sin esto no hay tope hacia atrás. */
+  min?: YearMonth;
 };
 
-export function MonthSwitcher({ value, onChange }: MonthSwitcherProps) {
+export function MonthSwitcher({ value, onChange, max, min }: MonthSwitcherProps) {
   const tint = useThemeColor({}, 'tint');
   const card = useThemeColor({}, 'card');
   const border = useThemeColor({}, 'border');
 
-  const go = (delta: number) => {
-    const d = new Date(value.year, value.month - 1 + delta, 1);
-    onChange({ year: d.getFullYear(), month: d.getMonth() + 1 });
-  };
+  const go = (delta: number) => onChange(shiftMonth(value, delta));
+
+  const canGoForward = !max || compareMonths(shiftMonth(value, 1), max) <= 0;
+  const canGoBack = !min || compareMonths(shiftMonth(value, -1), min) >= 0;
 
   return (
     <View style={[styles.row, { backgroundColor: card, borderColor: border }]}>
       <Pressable
         accessibilityRole="button"
         accessibilityLabel="Mes anterior"
+        accessibilityState={{ disabled: !canGoBack }}
+        disabled={!canGoBack}
         onPress={() => go(-1)}
-        style={({ pressed }) => [styles.arrow, { opacity: pressed ? 0.5 : 1 }]}>
+        style={({ pressed }) => [
+          styles.arrow,
+          { opacity: !canGoBack ? 0.3 : pressed ? 0.5 : 1 },
+        ]}>
         <IconSymbol name="chevron.left" size={20} color={tint} />
       </Pressable>
 
@@ -38,8 +47,13 @@ export function MonthSwitcher({ value, onChange }: MonthSwitcherProps) {
       <Pressable
         accessibilityRole="button"
         accessibilityLabel="Mes siguiente"
+        accessibilityState={{ disabled: !canGoForward }}
+        disabled={!canGoForward}
         onPress={() => go(1)}
-        style={({ pressed }) => [styles.arrow, { opacity: pressed ? 0.5 : 1 }]}>
+        style={({ pressed }) => [
+          styles.arrow,
+          { opacity: !canGoForward ? 0.3 : pressed ? 0.5 : 1 },
+        ]}>
         <IconSymbol name="chevron.right" size={20} color={tint} />
       </Pressable>
     </View>

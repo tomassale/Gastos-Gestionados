@@ -24,10 +24,26 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
+        name="history"
+        options={{
+          title: 'Historial',
+          tabBarIcon: ({ color }) => (
+            <IconSymbol size={28} name="clock.arrow.circlepath" color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
         name="summary"
         options={{
           title: 'Resumen',
           tabBarIcon: ({ color }) => <IconSymbol size={28} name="chart.pie.fill" color={color} />,
+        }}
+      />
+      <Tabs.Screen
+        name="settings"
+        options={{
+          title: 'Configuración',
+          tabBarIcon: ({ color }) => <IconSymbol size={28} name="gearshape.fill" color={color} />,
         }}
       />
     </Tabs>

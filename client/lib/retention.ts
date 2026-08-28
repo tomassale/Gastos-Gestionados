@@ -1,3 +1,4 @@
+import type { YearMonth } from '@/lib/month';
 import type { Expense } from '@/lib/types';
 
 /**
@@ -30,4 +31,14 @@ export function pruneOldExpenses(
 ): Expense[] {
   const kept = expenses.filter((e) => !isBeyondRetention(e, cutoff));
   return kept.length === expenses.length ? expenses : kept;
+}
+
+/**
+ * El mes más viejo que todavía conserva gastos. Más atrás no hay nada para
+ * mirar: la retención ya los borró del dispositivo y de la base, así que
+ * dejar navegar hasta ahí solo muestra meses vacíos.
+ */
+export function earliestKeptMonth(today: Date = new Date()): YearMonth {
+  const [year, month] = retentionCutoff(today).split('-').map(Number);
+  return { year, month };
 }

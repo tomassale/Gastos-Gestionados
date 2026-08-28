@@ -1,7 +1,6 @@
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import 'react-native-reanimated';
 
 import { ExpensesProvider } from '@/contexts/expenses-context';
 import { HouseholdProvider } from '@/contexts/household-context';
@@ -27,14 +26,6 @@ export default function RootLayout() {
                 <Stack.Screen
                   name="expense-form"
                   options={{ presentation: 'modal', title: 'Gasto' }}
-                />
-                <Stack.Screen
-                  name="people"
-                  options={{ presentation: 'modal', title: 'Personas' }}
-                />
-                <Stack.Screen
-                  name="household"
-                  options={{ presentation: 'modal', title: 'Hogar compartido' }}
                 />
               </Stack>
               <StatusBar style="light" />

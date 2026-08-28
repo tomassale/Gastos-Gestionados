@@ -11,6 +11,9 @@ type TextFieldProps = {
   keyboardType?: KeyboardTypeOptions;
   error?: string;
   autoFocus?: boolean;
+  /** Para lo que se copia tal cual, como el código del hogar. */
+  autoCapitalize?: 'none' | 'sentences' | 'words' | 'characters';
+  autoCorrect?: boolean;
 };
 
 export function TextField({
@@ -21,6 +24,8 @@ export function TextField({
   keyboardType,
   error,
   autoFocus,
+  autoCapitalize,
+  autoCorrect,
 }: TextFieldProps) {
   const text = useThemeColor({}, 'text');
   const card = useThemeColor({}, 'card');
@@ -39,6 +44,8 @@ export function TextField({
         placeholderTextColor={muted}
         keyboardType={keyboardType}
         autoFocus={autoFocus}
+        autoCapitalize={autoCapitalize}
+        autoCorrect={autoCorrect}
         style={[
           styles.input,
           { color: text, backgroundColor: card, borderColor: error ? danger : border },

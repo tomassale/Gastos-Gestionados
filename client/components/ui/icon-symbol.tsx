@@ -1,35 +1,49 @@
-// Fallback for using MaterialIcons on Android and web.
+// En Android y web los íconos salen de Material Icons; en iOS, de SF Symbols
+// nativos (`icon-symbol.ios.tsx`).
 
-import MaterialIcons from '@expo/vector-icons/MaterialIcons';
+// Por la ruta directa y no por '@expo/vector-icons': el índice del paquete
+// importa todos los sets de íconos, y con ellos entran al bundle las
+// tipografías de Ionicons, FontAwesome y compañía, que acá no se usan.
+import createIconSet from '@expo/vector-icons/build/createIconSet';
 import { SymbolWeight, SymbolViewProps } from 'expo-symbols';
-import { ComponentProps } from 'react';
 import { OpaqueColorValue, type StyleProp, type TextStyle } from 'react-native';
 
-type IconMapping = Record<SymbolViewProps['name'], ComponentProps<typeof MaterialIcons>['name']>;
-type IconSymbolName = keyof typeof MAPPING;
+import glyphMap from '@/assets/fonts/material-icons-subset.json';
 
 /**
- * Add your SF Symbols to Material Icons mappings here.
- * - see Material Icons in the [Icons Directory](https://icons.expo.fyi).
- * - see SF Symbols in the [SF Symbols](https://developer.apple.com/sf-symbols/) app.
+ * La tipografía completa de Material Icons son 2234 glifos y 349 KB para los
+ * siete que se dibujan acá. Esta es la versión recortada que produce
+ * `scripts/subset-icon-font.py`, junto con el mapa de nombres de al lado.
  */
-const MAPPING = {
-  'house.fill': 'home',
-  'paperplane.fill': 'send',
-  'chevron.left.forwardslash.chevron.right': 'code',
+const MaterialIcons = createIconSet(
+  glyphMap,
+  'MaterialIconsSubset',
+  require('@/assets/fonts/material-icons-subset.ttf')
+);
+
+/** Los nombres que quedaron en la fuente recortada: fuera de estos no hay glifo. */
+type MaterialIconName = keyof typeof glyphMap;
+
+/**
+ * Mapeo de SF Symbols a Material Icons. Solo están los íconos que la app usa:
+ * agregar uno pide agregarlo también a `scripts/subset-icon-font.py` y volver a
+ * correrlo, o esto no compila.
+ */
+const MAPPING: Record<string, MaterialIconName> = {
   'chevron.right': 'chevron-right',
   'chevron.left': 'chevron-left',
   'list.bullet': 'receipt-long',
   'chart.pie.fill': 'pie-chart',
   'plus': 'add',
-  'square.and.arrow.down': 'file-download',
-  'square.and.arrow.up': 'file-upload',
-} as IconMapping;
+  'clock.arrow.circlepath': 'history',
+  'gearshape.fill': 'settings',
+} satisfies Record<string, MaterialIconName>;
+
+export type IconSymbolName = Extract<SymbolViewProps['name'], keyof typeof MAPPING>;
 
 /**
- * An icon component that uses native SF Symbols on iOS, and Material Icons on Android and web.
- * This ensures a consistent look across platforms, and optimal resource usage.
- * Icon `name`s are based on SF Symbols and require manual mapping to Material Icons.
+ * Un ícono con el mismo aspecto en las tres plataformas. Los nombres son los de
+ * SF Symbols y se traducen a mano a Material Icons.
  */
 export function IconSymbol({
   name,

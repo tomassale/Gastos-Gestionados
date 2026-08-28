@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 
 import {
+  earliestKeptMonth,
   isBeyondRetention,
   pruneOldExpenses,
   RETENTION_YEARS,
@@ -76,5 +77,16 @@ describe('pruneOldExpenses', () => {
 
   test('con la lista vacía no rompe', () => {
     expect(pruneOldExpenses([], CORTE)).toEqual([]);
+  });
+});
+
+describe('earliestKeptMonth', () => {
+  test('es el mes del corte de retención', () => {
+    // Con dos años de retención, desde agosto de 2026 el corte cae en 2024-08.
+    expect(earliestKeptMonth(new Date('2026-08-27T12:00:00Z'))).toEqual({ year: 2024, month: 8 });
+  });
+
+  test('cruza el fin de año hacia atrás', () => {
+    expect(earliestKeptMonth(new Date('2026-01-15T12:00:00Z'))).toEqual({ year: 2024, month: 1 });
   });
 });
