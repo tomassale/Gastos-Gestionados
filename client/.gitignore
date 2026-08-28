@@ -44,3 +44,5 @@ app-example
 
 # Credenciales locales de Supabase
 .env
+
+.vercel

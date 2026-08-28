@@ -564,15 +564,42 @@ begin
 end;
 $$;
 
--- La app solo puede llamar a estas cuatro. El `revoke` no es decorativo:
+/**
+ * Ping para que el proyecto no se duerma. El plan gratuito de Supabase pausa la
+ * base tras una semana sin actividad, y hay que despausarla a mano desde el
+ * panel; la llama una tarea programada todos los días
+ * (`.github/workflows/supabase-keepalive.yml`).
+ *
+ * Lee `households` a propósito: así la actividad llega a Postgres y no se queda
+ * en el borde. No devuelve nada del contenido, solo la hora del servidor, así
+ * que no le sirve a nadie más que al reloj.
+ */
+create or replace function heartbeat()
+returns timestamptz
+language plpgsql
+security definer
+set search_path = public, extensions
+as $$
+declare
+  v_ignored bigint;
+begin
+  select count(*) into v_ignored from households;
+  return now();
+end;
+$$;
+
+-- La app solo puede llamar a estas cuatro (`heartbeat` no lo usa la app, sino
+-- la tarea programada, con la misma anon key). El `revoke` no es decorativo:
 -- PostgreSQL le da EXECUTE a PUBLIC a toda función recién creada, así que sin
 -- esto quedarían abiertas a cualquier rol que se agregue más adelante.
 revoke all on function create_household(text, text) from public;
 revoke all on function check_household(text) from public;
 revoke all on function pull_changes(text, timestamptz) from public;
 revoke all on function push_changes(text, json, json) from public;
+revoke all on function heartbeat() from public;
 
 grant execute on function create_household(text, text) to anon;
 grant execute on function check_household(text) to anon;
 grant execute on function pull_changes(text, timestamptz) to anon;
 grant execute on function push_changes(text, json, json) to anon;
+grant execute on function heartbeat() to anon;

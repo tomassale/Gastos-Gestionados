@@ -15,8 +15,8 @@ MAIN = (0x2D, 0xD4, 0xBF)
 SECOND = (0x0F, 0x76, 0x6E)
 
 # Proporciones del anillo dentro del lienzo, en fracciones del lado. Salen del
-# icono principal: el splash y el favicon usan las mismas para que en todos
-# lados se vea la misma figura y no una version mas chica o mas gorda.
+# icono principal: el splash usa las mismas para que en todos lados se vea la
+# misma figura y no una version mas chica o mas gorda.
 OUTER = 340 / 1024
 INNER = 196 / 1024
 
@@ -139,9 +139,6 @@ write_png(f'{BASE}/android-icon-monochrome.png', 1024, 1024, render(1024, 268, 1
 # Splash: mismo dibujo que el icono. Se deja transparente porque el color de
 # fondo lo pone app.json, y asi el mismo archivo sirve en claro y en oscuro.
 write_png(f'{BASE}/splash-icon.png', 1024, 1024, icon(1024))
-
-# Favicon: el mismo icono, en el tamano que pide la pestana del navegador.
-write_png(f'{BASE}/favicon.png', 64, 64, icon(64, background=BG))
 
 # Logo para usar dentro de la app: sin fondo y sin el margen del launcher, que
 # ahi no hace falta reservar lugar para el recorte.

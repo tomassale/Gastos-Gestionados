@@ -5,9 +5,9 @@ Estado al 27 de agosto de 2026.
 ## Bloqueado: necesito que lo hagas vos
 
 - [ ] **Correr `supabase/schema.sql` de nuevo, y esta vez sí hace falta.** Trae lo que salió de
-      la auditoría de seguridad: el freno por intentos fallidos contra la fuerza bruta del
-      código, bcrypt en cost 12, la búsqueda por índice, la clave primaria por hogar y los topes
-      de tamaño. Sigue siendo idempotente y migra solo lo que encuentra hecho de antes. Hasta que
+      la auditoría de seguridad más la función `heartbeat()` del keep-alive: el freno por
+      intentos fallidos contra la fuerza bruta del código, bcrypt en cost 12, la búsqueda por
+      índice, la clave primaria por hogar y los topes de tamaño. Sigue siendo idempotente y migra solo lo que encuentra hecho de antes. Hasta que
       no lo corras, la base sigue como está: la app anda igual, pero sin ninguna de esas defensas.
       Al correrlo, verificá que el freno tenga de dónde leer la IP —`select client_ip();` desde
       el SQL Editor no sirve, tiene que ser a través de PostgREST—; si diera null, el freno no
@@ -16,10 +16,18 @@ Estado al 27 de agosto de 2026.
       con 80 bits de azar, pero eso no alcanza para los que ya están: el código viejo no se puede
       derivar del hash. Si el hogar tiene datos que importan, creá uno nuevo y volvé a entrar
       desde los dos dispositivos.
-- [ ] **Confirmar el nombre del proyecto en Vercel.** Quedaba renombrarlo de `dist` a
-      `gastos-gestionados`. Probé `gastos-gestionados.vercel.app` y `dist-tomassale.vercel.app`
-      y las dos dan 404, así que no sé con qué nombre quedó publicado. Se hace desde el panel: el
-      token del CLI no autoriza el cambio.
+- [ ] **Cargar los dos secretos del repositorio para el keep-alive**, en GitHub → Settings →
+      Secrets and variables → Actions: `SUPABASE_URL` y `SUPABASE_ANON_KEY`, los mismos valores
+      que están en `client/.env`. El workflow ya está escrito
+      (`.github/workflows/supabase-keepalive.yml`): llama a `heartbeat()` una vez por día para
+      que el plan gratuito no pause la base tras una semana sin actividad. Sin los secretos, la
+      corrida falla a propósito en vez de fingir que anduvo. Se prueba a mano desde la solapa
+      Actions con “Run workflow”. Ojo con una trampa de GitHub: si el repo pasa **60 días sin
+      commits**, las tareas programadas se desactivan solas —avisa por mail— y hay que volver a
+      habilitarlas desde esa misma solapa.
+
+- [ ] **Borrar el proyecto de Vercel de la cuenta personal**, si seguía existiendo. La app
+      ya no se publica en web y el repo no tiene con qué compilar un sitio.
 - [ ] **Borrar los datos de prueba de la nube**: el hogar `casa-prueba-9271-vk` con un gasto de
       prueba, otro llamado "x", y el de la prueba de sincronización automática
       (`Prueba sincronización`, del 27/8/2026). Se borran con `supabase/reset.sql`, o el último
@@ -28,7 +36,7 @@ Estado al 27 de agosto de 2026.
       sincronización automática —`hooks/use-sync.ts`, `hooks/use-synced-state.ts`,
       `contexts/sync-context.tsx`, los dos contextos de datos, `lib/sync.ts`,
       `hooks/use-persisted-state.ts`, las tres pantallas— y los íconos regenerados
-      (`splash-icon.png`, `favicon.png`, `scripts/make-icons.py`).
+      (`splash-icon.png`, `scripts/make-icons.py`).
 
 ## Sin verificar
 
@@ -41,11 +49,6 @@ Estado al 27 de agosto de 2026.
       conectado para instalarlo y verlo arrancar. Lo que más conviene mirar es que los íconos se
       dibujen y que la app no se caiga al abrir: se quitó `react-native-reanimated`, que en web
       quedó demostrado que no lo usa nadie, pero en nativo no se probó.
-- [ ] **La CSP en el navegador.** Verifiqué que el build no tenga recursos de otros orígenes,
-      ni `blob:`, ni workers, ni `eval` que llegue a ejecutarse, y que las cabeceras salgan bien
-      servidas. Falta abrir el sitio publicado con la consola a la vista y confirmar que no
-      aparezca ninguna violación: la extensión de Chrome no respondió cuando lo intenté.
-
 - [ ] **La sincronización automática, con dos dispositivos en la mano.** Lo verificado el
       27/8/2026 es la capa de red, contra la base real y con dos dispositivos simulados: la
       subida llega, el pull incremental con margen trae lo nuevo sin volver a bajar todo, y las
@@ -54,8 +57,6 @@ Estado al 27 de agosto de 2026.
 
 ## Para hacer
 
-- [ ] **Redesplegar para que el sitio tome el favicon nuevo.** Como Vercel ya está conectado al
-      repo, alcanza con pushear: el `dist/` que hay en la compu quedó con el favicon viejo.
 - [ ] **EAS Update**, si alguna vez querés publicar cambios sin reinstalar el APK. El APK ya no
       necesita EAS: se compila en esta misma máquina con `expo prebuild --platform android` y
       `android/gradlew assembleRelease`, porque están el JDK 17 y el SDK de Android. Sale firmado
@@ -64,10 +65,6 @@ Estado al 27 de agosto de 2026.
       `android/app/build.gradle`. Ojo con `android/local.properties`: la ruta del SDK va con
       barras normales, porque en formato properties `\t` de `\tomas` se lee como tabulación y el
       build falla con un error que no dice nada.
-- [ ] **GitHub Action programada que consulte Supabase una vez por día.** El plan gratuito
-      **pausa el proyecto tras una semana sin actividad**; no se pierden datos, pero hay que
-      despausarlo a mano desde el panel. Con la app siendo local-first la pausa no rompe nada,
-      solo frena la sincronización.
 - [ ] **El README sigue siendo el del template de Expo.** Cuando quieras documentar, se hace con
       el subagente `documentador`.
 
@@ -80,16 +77,22 @@ Estado al 27 de agosto de 2026.
       `withOverlap`), pero los temporizadores, el reintento y el `AppState` de
       `hooks/use-sync.ts` no se prueban solos: haría falta montar React en los tests, y hoy no
       hay con qué. Es la parte que más se va a tocar y la que menos red tiene.
-- [ ] **Advertencias de deprecación de `react-native-web`** en el arranque: `shadow*` hay que
-      pasarlo a `boxShadow`, y `props.pointerEvents` a `style.pointerEvents`. Hoy solo ensucian
-      el log; en la próxima major dejan de andar.
-- [ ] **`logo.png` quedó con geometría propia.** El ícono, el splash y el favicon dibujan el
-      anillo con la misma proporción; el logo de adentro de la app lo dibuja más grande y sin
+- [ ] **`logo.png` quedó con geometría propia.** El ícono y el splash dibujan el anillo con
+      la misma proporción; el logo de adentro de la app lo dibuja más grande y sin
       fondo, que para uso inline está bien. Si alguna vez se quiere unificar del todo, sale de
       la constante `OUTER` en `scripts/make-icons.py`.
 
 ## Decisiones tomadas, para no rediscutirlas
 
+- **La app es solo móvil: se sacó el soporte web** (27/8/2026). Se fueron `vercel.json` con su
+  CSP, `dist/`, los scripts `build` y `web`, el bloque `web` de `app.json`, `favicon.png` y las
+  dependencias `react-native-web` y `react-dom`. No había nada compartido que romper: cero
+  archivos `.web.tsx`, cero `Platform.OS === 'web'` y ningún import propio de esas dos librerías.
+  Ojo con dos nombres que engañan: `scripts/make-icons.py` genera también los íconos de Android,
+  y `expo-web-browser` abre el navegador in-app en el teléfono —ninguno de los dos es web—.
+  Sacarlas de `dependencies` no achicó nada: `expo` y `expo-router` las siguen instalando como
+  transitivas. Si alguna vez vuelve la web, lo que hay que reponer es la CSP: era la única
+  defensa contra XSS del sitio.
 - **El código del hogar lo genera el dispositivo, no la persona** (27/8/2026, sale de la
   auditoría de seguridad). Son 16 símbolos de un alfabeto de 32 sin caracteres confundibles: 80
   bits. Un código pensado a mano caía con un diccionario, y como la base lo busca entre todos los
@@ -148,8 +151,8 @@ Estado al 27 de agosto de 2026.
   compartido y la administración de personas, que antes vivían en dos modales sueltos. Las
   rutas `/people` y `/household` ya no existen.
 - **Los íconos se generan, no se dibujan a mano.** `scripts/make-icons.py` los produce sin
-  dependencias, y el ícono, el splash y el favicon salen de la misma proporción para que sean la
-  misma figura en todos lados. Los de Android van más chicos a propósito: el launcher recorta el
+  dependencias, y el ícono y el splash salen de la misma proporción para que sean la misma
+  figura en todos lados. Los de Android van más chicos a propósito: el launcher recorta el
   lienzo y solo garantiza el 66% central.
 
 ## Antes de dar el proyecto por terminado

@@ -7,7 +7,6 @@
     "reset-project": "node ./scripts/reset-project.js",
     "android": "expo start --android",
     "ios": "expo start --ios",
-    "web": "expo start --web",
     "lint": "expo lint",
     "test": "bun test",
     "test:watch": "bun test --watch"
@@ -31,12 +30,10 @@
     "expo-system-ui": "~6.0.9",
     "expo-web-browser": "~15.0.11",
     "react": "19.1.0",
-    "react-dom": "19.1.0",
     "react-native": "0.81.5",
     "react-native-gesture-handler": "~2.28.0",
     "react-native-safe-area-context": "~5.6.0",
-    "react-native-screens": "~4.16.0",
-    "react-native-web": "~0.21.0"
+    "react-native-screens": "~4.16.0"
   },
   "devDependencies": {
     "@types/bun": "^1.4.0",

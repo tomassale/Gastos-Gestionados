@@ -1,0 +1,56 @@
+# Mantiene despierto el proyecto de Supabase.
+#
+# El plan gratuito pausa la base tras una semana sin actividad. No se pierden
+# datos, pero hay que despausarla a mano desde el panel y mientras tanto la
+# sincronización entre dispositivos queda frenada. Una llamada por día deja seis
+# días de margen: si el runner falla un par de veces, no pasa nada.
+name: Supabase keep-alive
+
+on:
+  schedule:
+    # 12:17 UTC, poco después de las 9 en Argentina. El minuto salteado es a
+    # propósito: en la hora en punto GitHub encola miles de tareas y demora.
+    - cron: '17 12 * * *'
+  workflow_dispatch:
+
+# Con la agenda diaria no hay dos corridas a la vez, pero sí puede haber una
+# programada y una a mano; no tiene sentido pinguear dos veces.
+concurrency:
+  group: supabase-keepalive
+  cancel-in-progress: false
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Llamar a heartbeat()
+        env:
+          # Ninguno de los dos es confidencial: la URL ya está escrita en
+          # `client/vercel.json` (dentro de la CSP) y la anon key viaja dentro
+          # de la app. Van como secretos por comodidad —un solo lugar donde
+          # cambiarlos—, no porque haya algo que esconder. Lo que protege los
+          # datos es el código del hogar.
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+        run: |
+          set -euo pipefail
+
+          if [ -z "${SUPABASE_URL}" ] || [ -z "${SUPABASE_ANON_KEY}" ]; then
+            echo "Faltan los secretos SUPABASE_URL y SUPABASE_ANON_KEY del repositorio." >&2
+            exit 1
+          fi
+
+          status=$(curl --silent --show-error --max-time 30 \
+            --output response.json --write-out '%{http_code}' \
+            --request POST "${SUPABASE_URL}/rest/v1/rpc/heartbeat" \
+            --header "apikey: ${SUPABASE_ANON_KEY}" \
+            --header "Authorization: Bearer ${SUPABASE_ANON_KEY}" \
+            --header 'Content-Type: application/json' \
+            --data '{}')
+
+          echo "HTTP ${status} — $(cat response.json)"
+
+          # Un fallo acá es la señal de que algo pasó: o el proyecto ya estaba
+          # pausado, o las credenciales cambiaron, o falta correr schema.sql.
+          [ "${status}" = "200" ]
