@@ -26,18 +26,20 @@ jobs:
     steps:
       - name: Llamar a heartbeat()
         env:
-          # Ninguno de los dos es confidencial: la URL ya está escrita en
-          # `client/vercel.json` (dentro de la CSP) y la anon key viaja dentro
-          # de la app. Van como secretos por comodidad —un solo lugar donde
-          # cambiarlos—, no porque haya algo que esconder. Lo que protege los
-          # datos es el código del hogar.
+          # Ninguno de los dos es confidencial: los dos viajan dentro del APK,
+          # horneados en el bundle. Van como secretos por comodidad —un solo
+          # lugar donde cambiarlos—, no porque haya algo que esconder. Lo que
+          # protege los datos es el código del hogar.
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
         run: |
           set -euo pipefail
 
           if [ -z "${SUPABASE_URL}" ] || [ -z "${SUPABASE_ANON_KEY}" ]; then
-            echo "Faltan los secretos SUPABASE_URL y SUPABASE_ANON_KEY del repositorio." >&2
+            echo "SUPABASE_URL y SUPABASE_ANON_KEY llegaron vacíos." >&2
+            echo "Tienen que ser Repository secrets. Si están cargados como Environment" >&2
+            echo "secrets de un entorno, este job no los ve: o los movés, o el job declara" >&2
+            echo "ese entorno con 'environment: <nombre>'." >&2
             exit 1
           fi
 

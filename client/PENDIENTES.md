@@ -4,40 +4,27 @@ Estado al 27 de agosto de 2026.
 
 ## Bloqueado: necesito que lo hagas vos
 
-- [ ] **Correr `supabase/schema.sql` de nuevo, y esta vez sí hace falta.** Trae lo que salió de
-      la auditoría de seguridad más la función `heartbeat()` del keep-alive: el freno por
-      intentos fallidos contra la fuerza bruta del código, bcrypt en cost 12, la búsqueda por
-      índice, la clave primaria por hogar y los topes de tamaño. Sigue siendo idempotente y migra solo lo que encuentra hecho de antes. Hasta que
-      no lo corras, la base sigue como está: la app anda igual, pero sin ninguna de esas defensas.
-      Al correrlo, verificá que el freno tenga de dónde leer la IP —`select client_ip();` desde
-      el SQL Editor no sirve, tiene que ser a través de PostgREST—; si diera null, el freno no
-      bloquea a nadie a propósito, que es preferible a bloquear a quien sí sabe el código.
+- [ ] **Verificar que el freno por intentos fallidos tenga de dónde leer la IP.** El schema
+      ya está aplicado —el keep-alive devolvió 200 y `heartbeat()` solo es ejecutable por
+      `anon` después del `grant` que cierra el archivo, así que corrió entero—. Falta un
+      detalle: `select client_ip();` desde el SQL Editor no sirve, tiene que ser a través de
+      PostgREST. Si diera null, el freno no bloquea a nadie a propósito, que es preferible a
+      bloquear a quien sí sabe el código.
 - [ ] **Los hogares que ya existan tienen código elegido a mano.** La app ahora genera el código
       con 80 bits de azar, pero eso no alcanza para los que ya están: el código viejo no se puede
       derivar del hash. Si el hogar tiene datos que importan, creá uno nuevo y volvé a entrar
       desde los dos dispositivos.
-- [ ] **Cargar los dos secretos del repositorio para el keep-alive**, en GitHub → Settings →
-      Secrets and variables → Actions: `SUPABASE_URL` y `SUPABASE_ANON_KEY`, los mismos valores
-      que están en `client/.env`. El workflow ya está escrito
-      (`.github/workflows/supabase-keepalive.yml`): llama a `heartbeat()` una vez por día para
-      que el plan gratuito no pause la base tras una semana sin actividad. Sin los secretos, la
-      corrida falla a propósito en vez de fingir que anduvo. Se prueba a mano desde la solapa
-      Actions con “Run workflow”. Ojo con una trampa de GitHub: si el repo pasa **60 días sin
-      commits**, las tareas programadas se desactivan solas —avisa por mail— y hay que volver a
-      habilitarlas desde esa misma solapa.
-
+- [ ] **Commitear el retoque del keep-alive.** Quedó sin commitear
+      `.github/workflows/supabase-keepalive.yml`: se le corrigió un comentario que nombraba
+      `client/vercel.json` —borrado al sacar la web— y el mensaje de error, que ahora explica
+      la diferencia entre Repository secrets y Environment secrets. El workflow en sí ya
+      funciona: la corrida manual del 27/8/2026 devolvió 200.
 - [ ] **Borrar el proyecto de Vercel de la cuenta personal**, si seguía existiendo. La app
       ya no se publica en web y el repo no tiene con qué compilar un sitio.
 - [ ] **Borrar los datos de prueba de la nube**: el hogar `casa-prueba-9271-vk` con un gasto de
       prueba, otro llamado "x", y el de la prueba de sincronización automática
       (`Prueba sincronización`, del 27/8/2026). Se borran con `supabase/reset.sql`, o el último
       solo con `delete from households where name = 'Prueba sincronización';`.
-- [ ] **Commitear lo de esta sesión** (los commits los hacés vos). Sin commitear quedan la
-      sincronización automática —`hooks/use-sync.ts`, `hooks/use-synced-state.ts`,
-      `contexts/sync-context.tsx`, los dos contextos de datos, `lib/sync.ts`,
-      `hooks/use-persisted-state.ts`, las tres pantallas— y los íconos regenerados
-      (`splash-icon.png`, `scripts/make-icons.py`).
-
 ## Sin verificar
 
 - [ ] **Los íconos, a ojo, después de recortar la tipografía.** Los siete glifos están en la
@@ -84,6 +71,12 @@ Estado al 27 de agosto de 2026.
 
 ## Decisiones tomadas, para no rediscutirlas
 
+- **El keep-alive de Supabase anda** (27/8/2026). Una GitHub Action llama a `heartbeat()` una
+  vez por día para que el plan gratuito no pause la base tras una semana sin actividad. Los dos
+  valores van como **Repository secrets**, no como Environment secrets: un job solo ve los de un
+  entorno si lo declara con `environment:`, y cargados en el entorno equivocado llegan vacíos.
+  La trampa que queda es de GitHub: si el repo pasa **60 días sin commits**, las tareas
+  programadas se desactivan solas —avisa por mail— y hay que rehabilitarlas desde Actions.
 - **La app es solo móvil: se sacó el soporte web** (27/8/2026). Se fueron `vercel.json` con su
   CSP, `dist/`, los scripts `build` y `web`, el bloque `web` de `app.json`, `favicon.png` y las
   dependencias `react-native-web` y `react-dom`. No había nada compartido que romper: cero
